@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+data/
+tor-data/
+node_modules/
+dashboard/frontend/dist/
+*.tsbuildinfo
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+.vscode/
+.idea/

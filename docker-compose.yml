@@ -1,0 +1,93 @@
+services:
+  litecoind:
+    image: litecoinproject/litecoin-core:${LITECOIN_VERSION:-0.21}
+    container_name: litecoin-node
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/usr/local/bin/start-litecoind.sh"]
+    ports:
+      - "${LITECOIN_P2P_PORT:-9333}:9333"
+    volumes:
+      - ./docker/litecoin/start-litecoind.sh:/usr/local/bin/start-litecoind.sh:ro
+      - ${LITECOIN_DATA_DIR:-./data/litecoin}:/home/litecoin/.litecoin
+      - tor_onion:/tor-onion:ro
+    environment:
+      RPC_USER: ${RPC_USER:-litecoin}
+      RPC_PASSWORD: ${RPC_PASSWORD:-litecoin_rpc_secret}
+      DB_CACHE: ${DB_CACHE:-1024}
+      MAX_CONNECTIONS: ${MAX_CONNECTIONS:-125}
+      MAX_MEMPOOL: ${MAX_MEMPOOL:-300}
+      PRUNE_MB: ${PRUNE_MB:-0}
+      SOCKS5_PROXY: ${SOCKS5_PROXY:-}
+      ONLYNET_ONION: ${ONLYNET_ONION:-false}
+    networks:
+      - litecoin_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "litecoin-cli -rpcuser=$${RPC_USER:-litecoin} -rpcpassword=$${RPC_PASSWORD:-litecoin_rpc_secret} getblockchaininfo >/dev/null 2>&1 || exit 1"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  dashboard:
+    build:
+      context: ./dashboard
+    container_name: litecoin-dashboard
+    restart: unless-stopped
+    depends_on:
+      - litecoind
+    ports:
+      - "${DASHBOARD_PORT:-8080}:8080"
+    volumes:
+      - tor_onion:/tor-onion:ro
+    environment:
+      RPC_HOST: litecoind
+      RPC_PORT: "9332"
+      RPC_USER: ${RPC_USER:-litecoin}
+      RPC_PASSWORD: ${RPC_PASSWORD:-litecoin_rpc_secret}
+      ZMQ_HASHBLOCK: tcp://litecoind:28332
+      ZMQ_HASHTX: tcp://litecoind:28333
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-litecoin-admin}
+      LOCK_ENTIRE_DASHBOARD: ${LOCK_ENTIRE_DASHBOARD:-false}
+      EXTERNAL_PROXY: ${SOCKS5_PROXY:-}
+      PRUNE_MB: ${PRUNE_MB:-0}
+      DB_CACHE: ${DB_CACHE:-1024}
+      MAX_CONNECTIONS: ${MAX_CONNECTIONS:-125}
+      MAX_MEMPOOL: ${MAX_MEMPOOL:-300}
+      LITECOIN_P2P_PORT: ${LITECOIN_P2P_PORT:-9333}
+    networks:
+      - litecoin_net
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=3)"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  tor:
+    build:
+      context: ./docker/tor
+    container_name: litecoin-tor
+    restart: unless-stopped
+    profiles: ["tor"]
+    volumes:
+      - ./data/tor:/var/lib/tor
+      - tor_onion:/tor-onion
+    networks:
+      - litecoin_net
+
+networks:
+  litecoin_net:
+    driver: bridge
+
+volumes:
+  tor_onion:
