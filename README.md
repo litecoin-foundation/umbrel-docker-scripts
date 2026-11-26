@@ -1,11 +1,22 @@
 # Litecoin Node — Material 3 Glass Suite
 
+[![CI & Container Build](https://github.com/litecoin-foundation/umbrel-docker-scripts/actions/workflows/ci.yml/badge.svg)](https://github.com/litecoin-foundation/umbrel-docker-scripts/actions/workflows/ci.yml)
 [![Litecoin Core](https://img.shields.io/badge/Litecoin%20Core-0.21%20%2B%20MWEB-345D9D?style=flat-square)](https://litecoin.org/)
 [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-v2-2496ED?style=flat-square)](https://docs.docker.com/compose/)
 [![Architecture](https://img.shields.io/badge/Arch-amd64%20%7C%20arm64-10B981?style=flat-square)](#system-requirements)
 [![License: MIT](https://img.shields.io/badge/License-MIT-64748B?style=flat-square)](LICENSE)
 
 A standalone, open-source **2-container Docker Compose stack** for running a full **Litecoin Core (`0.21` + MWEB)** node paired with a unified **Material 3 Expressive Frosted Glass** dashboard, real-time ZMQ WebSocket updates, local block/transaction/UTXO explorer, mempool fee analyzer, and admin-protected RPC terminal.
+
+---
+
+## Screenshots
+
+![Litecoin Node Material 3 Glass Overview](docs/screenshots/overview.png)
+
+| Mempool & Fee Estimator | Block & Local UTXO Explorer | Interactive RPC Studio & Node Tools |
+| :---: | :---: | :---: |
+| ![Mempool View](docs/screenshots/mempool.png) | ![Explorer View](docs/screenshots/explorer.png) | ![Tools & RPC Console](docs/screenshots/tools-rpc.png) |
 
 ---
 

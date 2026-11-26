@@ -1,0 +1,92 @@
+name: CI & Container Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: dashboard/frontend/package-lock.json
+
+      - name: Build & type-check Material 3 Glass frontend
+        working-directory: dashboard/frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: dashboard/backend/requirements.txt
+
+      - name: Verify FastAPI backend & routes
+        run: |
+          pip install -r dashboard/backend/requirements.txt
+          PYTHONPATH=dashboard/backend python -c "from app.main import app; assert any(r.path == '/api/overview' for r in app.routes); print('Backend routes verified')"
+
+      - name: Validate Docker Compose & build container images
+        run: |
+          docker compose config -q
+          docker compose --profile tor config -q
+          docker compose build dashboard
+          docker compose --profile tor build tor
+
+  publish-ghcr:
+    needs: build-and-verify
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compute lowercase GHCR image name
+        id: meta
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/${REPO_LOWER}-dashboard" >> "$GITHUB_OUTPUT"
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF_NAME}"
+            echo "tags=ghcr.io/${REPO_LOWER}-dashboard:latest,ghcr.io/${REPO_LOWER}-dashboard:${TAG}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tags=ghcr.io/${REPO_LOWER}-dashboard:latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push multi-arch dashboard image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./dashboard
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
