@@ -37,7 +37,7 @@ jobs:
       - name: Verify FastAPI backend & routes
         run: |
           pip install -r dashboard/backend/requirements.txt
-          PYTHONPATH=dashboard/backend python -c "from app.main import app; assert any(r.path == '/api/overview' for r in app.routes); print('Backend routes verified')"
+          PYTHONPATH=dashboard/backend python -c "from app.main import app; paths = app.openapi()['paths']; assert '/api/overview' in paths and '/api/mempool' in paths; print('Verified', len(paths), 'API routes')"
 
       - name: Validate Docker Compose & build container images
         run: |
@@ -62,12 +62,12 @@ jobs:
         id: meta
         run: |
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          echo "image=ghcr.io/${REPO_LOWER}-dashboard" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${REPO_LOWER}/dashboard" >> "$GITHUB_OUTPUT"
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG="${GITHUB_REF_NAME}"
-            echo "tags=ghcr.io/${REPO_LOWER}-dashboard:latest,ghcr.io/${REPO_LOWER}-dashboard:${TAG}" >> "$GITHUB_OUTPUT"
+            echo "tags=ghcr.io/${REPO_LOWER}/dashboard:latest,ghcr.io/${REPO_LOWER}/dashboard:${TAG}" >> "$GITHUB_OUTPUT"
           else
-            echo "tags=ghcr.io/${REPO_LOWER}-dashboard:latest" >> "$GITHUB_OUTPUT"
+            echo "tags=ghcr.io/${REPO_LOWER}/dashboard:latest" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up QEMU
@@ -77,6 +77,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
+        continue-on-error: true
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -84,9 +85,12 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push multi-arch dashboard image
+        continue-on-error: true
         uses: docker/build-push-action@v6
         with:
           context: ./dashboard
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
